@@ -7,8 +7,8 @@ name: Shared .NET CI
 #
 # PR callers must trigger with pull_request_target: GitHub cannot resolve a
 # private cross-repo reusable workflow from a plain pull_request run, and the
-# merge-ref checkout below restores the "test the PR merge" semantics.
-# Safe for this org: only a single trusted author pushes branches, no forks.
+# checkout below pins the PR's own commit. Safe for this org: only a single
+# trusted author pushes branches, no forks.
 
 on:
   workflow_call:
@@ -40,8 +40,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # pull_request_target checks out the base by default; test the merge.
-          ref: ${{ github.event_name == 'pull_request_target' && format('refs/pull/{0}/merge', github.event.pull_request.number) || '' }}
+          # pull_request_target checks out the base by default; test the PR.
+          # Not refs/pull/N/merge: GitHub updates the merge ref asynchronously,
+          # so a run started by the push checks out a stale merge and tests
+          # yesterday's code (observed: head_sha at the tip, HEAD at the
+          # previous push). The PR's head commit exists the moment the event
+          # fires; main's own push run verifies the merged result.
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
 
       - uses: actions/setup-dotnet@v4
         with:
