@@ -4,6 +4,11 @@ name: Shared .NET CI
 # macOS runs on pushes to main only - the org is private, a macOS minute
 # costs ten Linux minutes, and the self-hosted Mac (label macos-latest)
 # takes these jobs when online. See infrastructure/README.md.
+#
+# PR callers must trigger with pull_request_target: GitHub cannot resolve a
+# private cross-repo reusable workflow from a plain pull_request run, and the
+# merge-ref checkout below restores the "test the PR merge" semantics.
+# Safe for this org: only a single trusted author pushes branches, no forks.
 
 on:
   workflow_call:
@@ -30,10 +35,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ github.event_name == 'pull_request' && fromJSON('["windows-latest", "ubuntu-latest"]') || (inputs['macos-on-main'] && fromJSON('["windows-latest", "ubuntu-latest", "macos-latest"]') || fromJSON('["windows-latest", "ubuntu-latest"]')) }}
+        os: ${{ contains(fromJSON('["pull_request", "pull_request_target"]'), github.event_name) && fromJSON('["windows-latest", "ubuntu-latest"]') || (inputs['macos-on-main'] && fromJSON('["windows-latest", "ubuntu-latest", "macos-latest"]') || fromJSON('["windows-latest", "ubuntu-latest"]')) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # pull_request_target checks out the base by default; test the merge.
+          ref: ${{ github.event_name == 'pull_request_target' && format('refs/pull/{0}/merge', github.event.pull_request.number) || '' }}
 
       - uses: actions/setup-dotnet@v4
         with:

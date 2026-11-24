@@ -24,13 +24,20 @@ name: CI
 on:
   push:
     branches: [main]
-  pull_request:
+  pull_request_target:
 permissions:
   contents: read
 jobs:
   ci:
     uses: shoji-labs/infrastructure/.github/workflows/dotnet-ci.yml@main
 ```
+
+Use `pull_request_target`, not `pull_request`: GitHub rejects a cross-repo
+reference to a private reusable workflow on `pull_request` runs (the file
+fails validation with zero jobs). `pull_request_target` resolves it, and the
+shared workflow checks out `refs/pull/N/merge` so PR code is still what gets
+built. This is safe as long as branches only come from trusted authors -
+which, in this org, they do.
 
 ```yaml
 # .github/workflows/release.yml in a consumer repo
