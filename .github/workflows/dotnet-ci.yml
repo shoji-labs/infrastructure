@@ -1,0 +1,46 @@
+name: Shared .NET CI
+
+# Reusable workflow: build + test on every platform pwsh 7 runs on.
+# macOS runs on pushes to main only - the org is private, a macOS minute
+# costs ten Linux minutes, and the self-hosted Mac (label macos-latest)
+# takes these jobs when online. See infrastructure/README.md.
+
+on:
+  workflow_call:
+    inputs:
+      dotnet-versions:
+        description: 'Multiline dotnet-version input for setup-dotnet.'
+        type: string
+        required: false
+        default: |
+          8.0.x
+          10.0.x
+      macos-on-main:
+        description: 'Add a macOS job on pushes to main.'
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ github.event_name == 'pull_request' && fromJSON('["windows-latest", "ubuntu-latest"]') || (inputs.macos-on-main && fromJSON('["windows-latest", "ubuntu-latest", "macos-latest"]') || fromJSON('["windows-latest", "ubuntu-latest"]')) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.dotnet-versions }}
+
+      - name: Build
+        run: dotnet build --configuration Release
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build

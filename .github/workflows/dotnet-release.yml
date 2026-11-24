@@ -1,0 +1,101 @@
+name: Shared release-please chain
+
+# Reusable workflow, self-contained for PRIVATE repositories: only GITHUB_TOKEN.
+#
+# Events made with GITHUB_TOKEN never trigger other workflows, so a release PR
+# opened by it gets no CI, and merging it with GITHUB_TOKEN would not trigger
+# the run that tags the release. Instead this one run does the whole chain:
+#   1. release-please opens or updates the release PR;
+#   2. the release PR's branch is built and tested on Windows + Linux;
+#   3. if everything passes, the PR is squash-merged and its branch deleted;
+#   4. release-please runs again and creates the tag and GitHub release.
+# No personal access token (a public_repo token cannot reach a private repo)
+# and no branch protection (not available on private repos without a paid
+# plan) are needed.
+#
+# Caller must grant: contents: write, pull-requests: write.
+
+on:
+  workflow_call:
+    inputs:
+      config-file:
+        description: 'Path to release-please-config.json in the calling repo.'
+        type: string
+        required: false
+        default: release-please-config.json
+      manifest-file:
+        description: 'Path to .release-please-manifest.json in the calling repo.'
+        type: string
+        required: false
+        default: .release-please-manifest.json
+      dotnet-versions:
+        description: 'Multiline dotnet-version input for setup-dotnet.'
+        type: string
+        required: false
+        default: |
+          8.0.x
+          10.0.x
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release PR / tag
+    runs-on: ubuntu-latest
+    outputs:
+      pr: ${{ steps.release.outputs.pr }}
+      release_created: ${{ steps.release.outputs.release_created }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: ${{ inputs.config-file }}
+          manifest-file: ${{ inputs.manifest-file }}
+
+  test-release-pr:
+    name: Test release PR (${{ matrix.os }})
+    needs: release-please
+    if: needs.release-please.outputs.pr != ''
+    strategy:
+      fail-fast: true
+      matrix:
+        # No macOS: the release PR only bumps versions of code main already
+        # tested on macOS (see dotnet-ci.yml: macOS minutes cost ten times
+        # as much).
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.dotnet-versions }}
+
+      - name: Build
+        run: dotnet build --configuration Release
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build
+
+  merge-release-pr:
+    name: Merge release PR and tag
+    needs: [release-please, test-release-pr]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Squash-merge the release PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ fromJSON(needs.release-please.outputs.pr).number }}
+        run: gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --squash --delete-branch
+
+      # The merge above was made with GITHUB_TOKEN, so it starts no new run:
+      # create the tag and release here instead.
+      - name: Tag and release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: ${{ inputs.config-file }}
+          manifest-file: ${{ inputs.manifest-file }}

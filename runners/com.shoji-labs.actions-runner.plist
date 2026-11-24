@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- LaunchAgent template: copy to ~/Library/LaunchAgents/, replace the two
+     /Users/oscar paths with the real home directory, then:
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.shoji-labs.actions-runner.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.shoji-labs.actions-runner</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/oscar/actions-runner/run.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/oscar/actions-runner</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/oscar/actions-runner/launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/oscar/actions-runner/launchd.log</string>
+</dict>
+</plist>
