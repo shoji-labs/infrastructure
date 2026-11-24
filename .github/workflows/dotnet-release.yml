@@ -57,7 +57,7 @@ jobs:
   test-release-pr:
     name: Test release PR (${{ matrix.os }})
     needs: release-please
-    if: needs.release-please.outputs.pr != ''
+    if: needs['release-please'].outputs.pr != ''
     strategy:
       fail-fast: true
       matrix:
@@ -69,7 +69,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
+          ref: ${{ fromJSON(needs['release-please'].outputs.pr).headBranchName }}
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -89,7 +89,7 @@ jobs:
       - name: Squash-merge the release PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ fromJSON(needs.release-please.outputs.pr).number }}
+          PR_NUMBER: ${{ fromJSON(needs['release-please'].outputs.pr).number }}
         run: gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --squash --delete-branch
 
       # The merge above was made with GITHUB_TOKEN, so it starts no new run:
