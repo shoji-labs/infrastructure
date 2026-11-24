@@ -14,9 +14,10 @@ templates, release-please configuration, and the self-hosted runner setup.
 
 ## Consuming the reusable workflows
 
-Private-to-private reuse inside the org works out of the box (the calling
-repo must not be more visible than this one). Permissions are inherited from
-the caller.
+**This repo must stay public.** GitHub cannot resolve a cross-repo `uses:`
+reference to a private reusable workflow - the calling workflow fails
+validation before any job is scheduled (verified 2026-11-24 on every event
+type). Consumer repos may be private; that direction is fine.
 
 ```yaml
 # .github/workflows/ci.yml in a consumer repo
@@ -32,12 +33,11 @@ jobs:
     uses: shoji-labs/infrastructure/.github/workflows/dotnet-ci.yml@main
 ```
 
-Use `pull_request_target`, not `pull_request`: GitHub rejects a cross-repo
-reference to a private reusable workflow on `pull_request` runs (the file
-fails validation with zero jobs). `pull_request_target` resolves it, and the
-shared workflow checks out `refs/pull/N/merge` so PR code is still what gets
-built. This is safe as long as branches only come from trusted authors -
-which, in this org, they do.
+PRs trigger with `pull_request_target` (workflow evaluated on the base branch,
+full repo token). The shared workflow then checks out `refs/pull/N/merge` so
+PR code is still what gets built. Safe while branches come only from trusted
+authors - which, in this org, they do. Note the trigger must already exist on
+`main` to fire: the PR that introduces it cannot have its own green check.
 
 ```yaml
 # .github/workflows/release.yml in a consumer repo
